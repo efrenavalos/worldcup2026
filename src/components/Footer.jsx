@@ -14,7 +14,7 @@ const Footer = () => (
     }}
   >
     <Typography variant="caption" color="text.secondary">
-      🏆 World Cup Pool 2026 · Todos los horarios en Mountain Time (MT)
+      🏆 World Cup Pool 2026 - Todos los horarios en Mountain Time (MT)
     </Typography>
   </Box>
 )
