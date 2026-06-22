@@ -89,31 +89,18 @@ const Admin = () => {
 
   // 2. Actualizar resultados (solo partidos FT)
   const updateResults = useMutation({
-    mutationFn: async () => {
-      const finished = await fetchFinishedFixtures()
-      if (!finished?.length) return 0
-
-      const updates = finished.map(f => ({
-        fixture_id: f.fixture.id,
-        status: 'FT',
-        home_score: f.goals.home,
-        away_score: f.goals.away,
-        updated_at: new Date().toISOString(),
-      }))
-
-      const { error } = await supabase
-        .from('matches')
-        .upsert(updates, { onConflict: 'fixture_id' })
-
-      if (error) throw error
-      return updates.length
-    },
-    onSuccess: (count) => {
-      setMessage({ type: 'success', text: `${count} resultados actualizados.` })
-      qc.invalidateQueries({ queryKey: ['matches'] })
-    },
-    onError: (err) => setMessage({ type: 'error', text: err.message }),
-  })
+  mutationFn: async () => {
+    // Usa la función SQL en lugar de llamar la API directamente
+    const { data, error } = await supabase.rpc('sync_wc_fixtures')
+    if (error) throw error
+    return data.matches_processed
+  },
+  onSuccess: (count) => {
+    setMessage({ type: 'success', text: `${count} resultados actualizados.` })
+    qc.invalidateQueries({ queryKey: ['matches'] })
+  },
+  onError: (err) => setMessage({ type: 'error', text: err.message }),
+})
 
   // 3. Recalcular puntos para todas las predicciones de partidos FT
   const recalculate = useMutation({
