@@ -2,13 +2,13 @@
 import { useState } from 'react'
 import {
   Card, CardContent, Box, Typography, Avatar, Chip,
-  Button, Divider, Tooltip,
+  Button, Divider, Tooltip, IconButton,
 } from '@mui/material'
-import { LockClock, CheckCircle, EditNote, Edit, FiberManualRecord } from '@mui/icons-material'
+import { LockClock, CheckCircle, EditNote, Edit, FiberManualRecord, People } from '@mui/icons-material'
 import { formatMatchDate, isMatchLocked, timeUntilMatch } from '../utils/timezoneHelper'
 import TeamHistoryModal from './TeamHistoryModal'
+import MatchPredictionsModal from './MatchPredictionsModal'
 
-// Partidos en curso (marcador en vivo)
 const LIVE_STATUSES = ['1H', 'HT', '2H', 'ET', 'P']
 
 const MatchCard = ({ match, prediction, onPredict }) => {
@@ -18,6 +18,7 @@ const MatchCard = ({ match, prediction, onPredict }) => {
   const hasPredict = !!prediction
   const canEdit = hasPredict && !locked
   const [teamHistory, setTeamHistory] = useState(null)
+  const [showPredictions, setShowPredictions] = useState(false)
 
   const getStatusChip = () => {
     if (isFinished) return { label: 'Finalizado', color: '#4a7a9b', bg: 'rgba(74,122,155,0.15)', live: false }
@@ -35,17 +36,34 @@ const MatchCard = ({ match, prediction, onPredict }) => {
         transition: 'transform 0.15s, box-shadow 0.15s',
         border: isLive ? '1px solid rgba(0,230,118,0.4)' : '1px solid #1e3a5f',
         boxShadow: isLive ? '0 0 20px rgba(0,230,118,0.1)' : 'none',
-        '&:hover': { transform: 'translateY(-2px)', boxShadow: isLive ? '0 0 28px rgba(0,230,118,0.2)' : '0 8px 32px rgba(0,191,255,0.12)' },
+        '&:hover': {
+          transform: 'translateY(-2px)',
+          boxShadow: isLive ? '0 0 28px rgba(0,230,118,0.2)' : '0 8px 32px rgba(0,191,255,0.12)',
+        },
       }}>
         <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
 
-          {/* Fecha y status */}
+          {/* Fecha, status y botón de predicciones */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, alignItems: 'center' }}>
             <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.72rem' }}>
               {formatMatchDate(match.match_date)}
             </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              {/* Punto pulsante si está en vivo */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              {/* Botón ver predicciones de todos */}
+              <Tooltip title="Ver predicciones de todos">
+                <IconButton
+                  size="small"
+                  onClick={() => setShowPredictions(true)}
+                  sx={{
+                    color: '#7fb3d3',
+                    '&:hover': { color: 'primary.main', background: 'rgba(0,191,255,0.08)' },
+                    p: 0.5,
+                  }}
+                >
+                  <People sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Tooltip>
+
               {status.live && (
                 <FiberManualRecord sx={{
                   fontSize: 10, color: '#00e676',
@@ -64,14 +82,13 @@ const MatchCard = ({ match, prediction, onPredict }) => {
             </Box>
           </Box>
 
-          {/* Equipos y marcador */}
+          {/* Equipos */}
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
             <TeamDisplay
               name={match.team_home} logo={match.home_logo} align="left"
               onClick={() => setTeamHistory({ team: match.team_home, logo: match.home_logo })}
             />
 
-            {/* Marcador central */}
             <Box sx={{ textAlign: 'center', px: 2, minWidth: 90 }}>
               {(isFinished || isLive) && match.home_score !== null ? (
                 <Box>
@@ -152,11 +169,17 @@ const MatchCard = ({ match, prediction, onPredict }) => {
           onClose={() => setTeamHistory(null)}
         />
       )}
+
+      {showPredictions && (
+        <MatchPredictionsModal
+          match={match}
+          onClose={() => setShowPredictions(false)}
+        />
+      )}
     </>
   )
 }
 
-// Label según status del partido
 const getLiveLabel = (status) => {
   const labels = { '1H': '1er Tiempo', 'HT': 'Medio Tiempo', '2H': '2do Tiempo', 'ET': 'Prórroga', 'P': 'Penales' }
   return labels[status] || 'En Vivo'
@@ -191,7 +214,6 @@ const PredictionBadge = ({ prediction, isFinished, isLive }) => {
   const pointsColor =
     prediction.points_awarded === 3 ? '#00e676' :
     prediction.points_awarded === 1 ? '#ffd700' : '#4a7a9b'
-
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
       <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
