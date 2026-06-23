@@ -1,13 +1,35 @@
 // hooks/useMatches.js
-// React Query hooks para partidos
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+// React Query + Supabase Realtime para actualizaciones instantáneas
+import { useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabaseClient'
 
-/**
- * Obtiene todos los partidos ordenados por fecha
- */
-export const useMatches = () =>
-  useQuery({
+export const useMatches = () => {
+  const queryClient = useQueryClient()
+
+  // Suscripción Realtime — se activa cuando cualquier match cambia en DB
+  useEffect(() => {
+    const channel = supabase
+      .channel('matches-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'matches' },
+        (payload) => {
+          // Actualiza solo el match que cambió en el cache local
+          queryClient.setQueryData(['matches'], (old) => {
+            if (!old) return old
+            return old.map(m =>
+              m.id === payload.new.id ? { ...m, ...payload.new } : m
+            )
+          })
+        }
+      )
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [queryClient])
+
+  return useQuery({
     queryKey: ['matches'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -17,12 +39,12 @@ export const useMatches = () =>
       if (error) throw error
       return data
     },
-    staleTime: 5 * 60 * 1000, // 5 min cache
+    staleTime: 2 * 60 * 1000,
+    refetchInterval: 3 * 60 * 1000,        // Fallback polling cada 3 min
+    refetchIntervalInBackground: false,
   })
+}
 
-/**
- * Obtiene partidos próximos (no finalizados)
- */
 export const useUpcomingMatches = () =>
   useQuery({
     queryKey: ['matches', 'upcoming'],
@@ -35,5 +57,7 @@ export const useUpcomingMatches = () =>
       if (error) throw error
       return data
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: 60 * 1000,
+    refetchInterval: 2 * 60 * 1000,
+    refetchIntervalInBackground: false,
   })

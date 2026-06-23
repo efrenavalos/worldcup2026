@@ -1,17 +1,44 @@
 // hooks/usePredictions.js
+import { useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabaseClient'
 import { useAuth } from '../contexts/AuthContext'
 
 export const usePredictions = () => {
   const { user } = useAuth()
+  const queryClient = useQueryClient()
+
+  // Realtime: refresca predicciones cuando cambian los puntos en DB
+  useEffect(() => {
+    if (!user) return
+    const channel = supabase
+      .channel('predictions-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'predictions',
+          filter: `user_id=eq.${user.id}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['predictions', user.id] })
+        }
+      )
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [user, queryClient])
+
   return useQuery({
     queryKey: ['predictions', user?.id],
     enabled: !!user,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('predictions')
-        .select(`*, matches (id, team_home, team_away, home_logo, away_logo, match_date, status, home_score, away_score)`)
+        .select(`
+          *,
+          matches (
+            id, team_home, team_away, home_logo, away_logo,
+            match_date, status, home_score, away_score
+          )
+        `)
         .eq('user_id', user.id)
         .order('id', { ascending: false })
       if (error) throw error
@@ -21,10 +48,6 @@ export const usePredictions = () => {
   })
 }
 
-/**
- * Guarda o actualiza predicción.
- * Permite editar mientras match_date > now() y status = 'NS'
- */
 export const useSavePrediction = () => {
   const queryClient = useQueryClient()
   const { user } = useAuth()
@@ -45,7 +68,6 @@ export const useSavePrediction = () => {
         )
         .select()
         .single()
-
       if (error) throw error
       return data
     },
