@@ -1,15 +1,19 @@
 // components/MatchCard.jsx
+import { useState } from 'react'
 import {
-  Card, CardContent, Box, Typography, Avatar, Chip, Button, Divider,
+  Card, CardContent, Box, Typography, Avatar, Chip,
+  Button, Divider, Tooltip,
 } from '@mui/material'
 import { LockClock, CheckCircle, EditNote, Edit } from '@mui/icons-material'
 import { formatMatchDate, isMatchLocked, timeUntilMatch } from '../utils/timezoneHelper'
+import TeamHistoryModal from './TeamHistoryModal'
 
 const MatchCard = ({ match, prediction, onPredict }) => {
   const locked = isMatchLocked(match.match_date) || match.status === 'FT' || match.status === '1H' || match.status === 'HT'
   const hasPredict = !!prediction
   const isFinished = match.status === 'FT'
-  const canEdit = hasPredict && !locked  // Tiene predicción pero aún puede editar
+  const canEdit = hasPredict && !locked
+  const [teamHistory, setTeamHistory] = useState(null)
 
   const getStatusChip = () => {
     if (isFinished) return { label: 'Finalizado', color: '#4a7a9b', bg: 'rgba(74,122,155,0.15)' }
@@ -20,99 +24,146 @@ const MatchCard = ({ match, prediction, onPredict }) => {
   const status = getStatusChip()
 
   return (
-    <Card sx={{
-      mb: 2,
-      transition: 'transform 0.15s, box-shadow 0.15s',
-      '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 8px 32px rgba(0,191,255,0.12)' },
-    }}>
-      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-        {/* Fecha y status */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, alignItems: 'center' }}>
-          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.72rem' }}>
-            {formatMatchDate(match.match_date)}
-          </Typography>
-          <Chip label={status.label} size="small" sx={{
-            fontSize: '0.65rem', height: 20, fontWeight: 600,
-            color: status.color, background: status.bg,
-            border: `1px solid ${status.color}40`,
-          }} />
-        </Box>
-
-        {/* Equipos */}
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <TeamDisplay name={match.team_home} logo={match.home_logo} align="left" />
-          <Box sx={{ textAlign: 'center', px: 2, minWidth: 80 }}>
-            {isFinished ? (
-              <Typography variant="h4" sx={{ fontWeight: 800, color: 'text.primary', letterSpacing: '-0.02em' }}>
-                {match.home_score} <Typography component="span" sx={{ color: '#4a7a9b', fontSize: '1.2rem' }}>-</Typography> {match.away_score}
-              </Typography>
-            ) : (
-              <Typography variant="h5" sx={{ fontWeight: 700, color: '#4a7a9b' }}>vs</Typography>
-            )}
-          </Box>
-          <TeamDisplay name={match.team_away} logo={match.away_logo} align="right" />
-        </Box>
-
-        <Divider sx={{ borderColor: '#1e3a5f', mb: 2 }} />
-
-        {/* Predicción y botones */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          {hasPredict ? (
-            <PredictionBadge prediction={prediction} isFinished={isFinished} />
-          ) : (
-            <Typography variant="caption" sx={{ color: '#4a7a9b' }}>
-              Sin predicción
+    <>
+      <Card sx={{
+        mb: 2,
+        transition: 'transform 0.15s, box-shadow 0.15s',
+        '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 8px 32px rgba(0,191,255,0.12)' },
+      }}>
+        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+          {/* Fecha y status */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, alignItems: 'center' }}>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.72rem' }}>
+              {formatMatchDate(match.match_date)}
             </Typography>
-          )}
-
-          <Box sx={{ display: 'flex', gap: 1, ml: 1 }}>
-            {/* Sin predicción y partido abierto */}
-            {!locked && !hasPredict && (
-              <Button variant="contained" size="small" onClick={() => onPredict(match)}
-                startIcon={<EditNote />} sx={{ fontSize: '0.75rem', py: 0.7 }}>
-                Predecir
-              </Button>
-            )}
-
-            {/* Tiene predicción y puede editar */}
-            {canEdit && (
-              <Button variant="outlined" size="small" onClick={() => onPredict(match)}
-                startIcon={<Edit />}
-                sx={{ fontSize: '0.75rem', py: 0.7, borderColor: '#ffd700', color: '#ffd700',
-                  '&:hover': { borderColor: '#ffd700', background: 'rgba(255,215,0,0.08)' } }}>
-                Editar
-              </Button>
-            )}
-
-            {/* Partido cerrado sin predicción */}
-            {locked && !hasPredict && (
-              <Chip icon={<LockClock sx={{ fontSize: '14px !important' }} />} label="Cerrado"
-                size="small" sx={{ fontSize: '0.65rem', color: '#4a7a9b', background: 'rgba(74,122,155,0.1)' }} />
-            )}
-
-            {/* Confirmada y cerrada */}
-            {hasPredict && locked && (
-              <Chip icon={<CheckCircle sx={{ fontSize: '14px !important' }} />} label="Confirmada"
-                size="small" sx={{ fontSize: '0.65rem', color: '#00e676', background: 'rgba(0,230,118,0.1)' }} />
-            )}
+            <Chip label={status.label} size="small" sx={{
+              fontSize: '0.65rem', height: 20, fontWeight: 600,
+              color: status.color, background: status.bg,
+              border: `1px solid ${status.color}40`,
+            }} />
           </Box>
-        </Box>
-      </CardContent>
-    </Card>
+
+          {/* Equipos — clickeables para ver historial */}
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <TeamDisplay
+              name={match.team_home}
+              logo={match.home_logo}
+              align="left"
+              onClick={() => setTeamHistory({ team: match.team_home, logo: match.home_logo })}
+            />
+
+            {/* Marcador central */}
+            <Box sx={{ textAlign: 'center', px: 2, minWidth: 80 }}>
+              {isFinished ? (
+                <Typography variant="h4" sx={{ fontWeight: 800, color: 'text.primary', letterSpacing: '-0.02em' }}>
+                  {match.home_score}{' '}
+                  <Typography component="span" sx={{ color: '#4a7a9b', fontSize: '1.2rem' }}>-</Typography>
+                  {' '}{match.away_score}
+                </Typography>
+              ) : (
+                <Typography variant="h5" sx={{ fontWeight: 700, color: '#4a7a9b' }}>vs</Typography>
+              )}
+            </Box>
+
+            <TeamDisplay
+              name={match.team_away}
+              logo={match.away_logo}
+              align="right"
+              onClick={() => setTeamHistory({ team: match.team_away, logo: match.away_logo })}
+            />
+          </Box>
+
+          <Divider sx={{ borderColor: '#1e3a5f', mb: 2 }} />
+
+          {/* Predicción y botones */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {hasPredict ? (
+              <PredictionBadge prediction={prediction} isFinished={isFinished} />
+            ) : (
+              <Typography variant="caption" sx={{ color: '#4a7a9b' }}>
+                Sin predicción
+              </Typography>
+            )}
+
+            <Box sx={{ display: 'flex', gap: 1, ml: 1 }}>
+              {!locked && !hasPredict && (
+                <Button variant="contained" size="small" onClick={() => onPredict(match)}
+                  startIcon={<EditNote />} sx={{ fontSize: '0.75rem', py: 0.7 }}>
+                  Predecir
+                </Button>
+              )}
+              {canEdit && (
+                <Button variant="outlined" size="small" onClick={() => onPredict(match)}
+                  startIcon={<Edit />}
+                  sx={{
+                    fontSize: '0.75rem', py: 0.7,
+                    borderColor: '#ffd700', color: '#ffd700',
+                    '&:hover': { borderColor: '#ffd700', background: 'rgba(255,215,0,0.08)' },
+                  }}>
+                  Editar
+                </Button>
+              )}
+              {locked && !hasPredict && (
+                <Chip icon={<LockClock sx={{ fontSize: '14px !important' }} />} label="Cerrado"
+                  size="small" sx={{ fontSize: '0.65rem', color: '#4a7a9b', background: 'rgba(74,122,155,0.1)' }} />
+              )}
+              {hasPredict && locked && (
+                <Chip icon={<CheckCircle sx={{ fontSize: '14px !important' }} />} label="Confirmada"
+                  size="small" sx={{ fontSize: '0.65rem', color: '#00e676', background: 'rgba(0,230,118,0.1)' }} />
+              )}
+            </Box>
+          </Box>
+        </CardContent>
+      </Card>
+
+      {/* Modal historial del equipo */}
+      {teamHistory && (
+        <TeamHistoryModal
+          team={teamHistory.team}
+          logo={teamHistory.logo}
+          onClose={() => setTeamHistory(null)}
+        />
+      )}
+    </>
   )
 }
 
-const TeamDisplay = ({ name, logo, align }) => (
-  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: align === 'left' ? 'flex-start' : 'flex-end', flex: 1, gap: 0.5 }}>
-    <Avatar src={logo} sx={{ width: 44, height: 44, background: '#0b1f3a', border: '1px solid #1e3a5f' }}>⚽</Avatar>
-    <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.72rem', color: 'text.primary', textAlign: align, lineHeight: 1.2, maxWidth: 80, wordBreak: 'break-word' }}>
-      {name}
-    </Typography>
-  </Box>
+// Equipo con tooltip y click
+const TeamDisplay = ({ name, logo, align, onClick }) => (
+  <Tooltip title={`Ver historial de ${name}`} placement="top">
+    <Box
+      onClick={onClick}
+      sx={{
+        display: 'flex', flexDirection: 'column',
+        alignItems: align === 'left' ? 'flex-start' : 'flex-end',
+        flex: 1, gap: 0.5, cursor: 'pointer', borderRadius: 2, p: 0.5,
+        transition: 'background 0.15s',
+        '&:hover': { background: 'rgba(0,191,255,0.08)' },
+      }}
+    >
+      <Avatar src={logo} sx={{
+        width: 44, height: 44,
+        background: '#0b1f3a',
+        border: '2px solid #1e3a5f',
+        transition: 'border-color 0.15s',
+        '&:hover': { borderColor: '#00bfff' },
+      }}>
+        ⚽
+      </Avatar>
+      <Typography variant="caption" sx={{
+        fontWeight: 600, fontSize: '0.72rem', color: 'text.primary',
+        textAlign: align, lineHeight: 1.2, maxWidth: 80, wordBreak: 'break-word',
+      }}>
+        {name}
+      </Typography>
+    </Box>
+  </Tooltip>
 )
 
 const PredictionBadge = ({ prediction, isFinished }) => {
-  const pointsColor = prediction.points_awarded === 3 ? '#00e676' : prediction.points_awarded === 1 ? '#ffd700' : '#4a7a9b'
+  const pointsColor =
+    prediction.points_awarded === 3 ? '#00e676' :
+    prediction.points_awarded === 1 ? '#ffd700' : '#4a7a9b'
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
       <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
@@ -121,7 +172,8 @@ const PredictionBadge = ({ prediction, isFinished }) => {
       {isFinished && prediction.points_awarded !== null && (
         <Chip label={`+${prediction.points_awarded} pts`} size="small" sx={{
           fontSize: '0.7rem', fontWeight: 700, height: 22,
-          color: pointsColor, background: `${pointsColor}20`, border: `1px solid ${pointsColor}40`,
+          color: pointsColor, background: `${pointsColor}20`,
+          border: `1px solid ${pointsColor}40`,
         }} />
       )}
     </Box>
