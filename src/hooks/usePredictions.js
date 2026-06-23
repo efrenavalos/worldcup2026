@@ -1,5 +1,4 @@
 // hooks/usePredictions.js
-// Sin Realtime — polling estable
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabaseClient'
 import { useAuth } from '../contexts/AuthContext'
@@ -28,6 +27,8 @@ export const usePredictions = () => {
     staleTime: 30 * 1000,
     refetchInterval: 30 * 1000,
     refetchIntervalInBackground: false,
+    // Mantiene datos anteriores durante refetch — evita parpadeo
+    placeholderData: (prev) => prev,
   })
 }
 

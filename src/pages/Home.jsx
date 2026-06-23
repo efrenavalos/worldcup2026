@@ -9,11 +9,20 @@ import PredictionDialog from '../components/PredictionDialog'
 
 const Home = () => {
   const { profile } = useAuth()
-  const { data: matches, isLoading: loadingMatches, error: matchError } = useMatches()
-  const { data: predictions, isLoading: loadingPreds } = usePredictions()
-  const [selectedMatch, setSelectedMatch] = useState(null)
+  const {
+    data: matches,
+    isLoading: loadingMatches,  // true solo la primera carga
+    error: matchError
+  } = useMatches()
+  const {
+    data: predictions,
+    isLoading: loadingPreds     // true solo la primera carga
+  } = usePredictions()
+
+  const [selected, setSelected] = useState(null)
   const [tab, setTab] = useState(0)
 
+  // Solo mostrar skeletons en la carga inicial, NO durante refetch
   const loading = loadingMatches || loadingPreds
 
   const predictionMap = (predictions || []).reduce((acc, p) => {
@@ -45,22 +54,20 @@ const Home = () => {
         <Tab label={`Finalizados (${finished.length})`} />
       </Tabs>
 
-      {matchError && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          Error cargando partidos. Intenta recargar la página.
-        </Alert>
-      )}
+      {matchError && <Alert severity="error" sx={{ mb: 2 }}>Error cargando partidos.</Alert>}
 
+      {/* Skeletons SOLO en primera carga */}
       {loading && Array.from({ length: 4 }).map((_, i) => (
         <Skeleton key={i} variant="rounded" height={160} sx={{ mb: 2, borderRadius: 2 }} />
       ))}
 
+      {/* Cards — se mantienen visibles durante refetch gracias a placeholderData */}
       {!loading && displayMatches.map((match) => (
         <MatchCard
           key={match.id}
           match={match}
           prediction={predictionMap[match.id] || null}
-          onPredict={setSelectedMatch}
+          onPredict={(m, p) => setSelected({ match: m, prediction: p })}
         />
       ))}
 
@@ -74,9 +81,10 @@ const Home = () => {
       )}
 
       <PredictionDialog
-        open={!!selectedMatch}
-        match={selectedMatch}
-        onClose={() => setSelectedMatch(null)}
+        open={!!selected}
+        match={selected?.match}
+        existingPrediction={selected?.prediction}
+        onClose={() => setSelected(null)}
       />
     </Box>
   )
