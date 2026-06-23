@@ -6,29 +6,17 @@ import {
 import { Close } from '@mui/icons-material'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../services/supabaseClient'
+import TeamLogo from './TeamLogo'
 
 const LIVE_STATUSES = ['1H', 'HT', '2H', 'ET', 'P']
 
-/**
- * Determina si una predicción todavía puede ser exacta dado el marcador en vivo
- * Reglas:
- *   - Si el local ya tiene más goles que los predichos → imposible
- *   - Si el visitante ya tiene más goles que los predichos → imposible
- *   - Si ambos están por debajo o igual → todavía posible
- *   - Si ya es exacto → exacto ahora mismo
- */
+const getOutcome = (h, a) => h > a ? 'home' : h < a ? 'away' : 'draw'
+
 const getLiveState = (predHome, predAway, liveHome, liveAway) => {
-  // Marcador exacto en este momento
   if (predHome === liveHome && predAway === liveAway) return 'live_exact'
-
-  // Ya es imposible si algún equipo superó los goles predichos
   if (liveHome > predHome || liveAway > predAway) return 'live_impossible'
-
-  // Todavía puede coincidir (marcador en progreso por debajo de la predicción)
   return 'live_possible'
 }
-
-const getOutcome = (h, a) => h > a ? 'home' : h < a ? 'away' : 'draw'
 
 const MatchPredictionsModal = ({ match, onClose }) => {
   const isFinished = match.status === 'FT'
@@ -63,17 +51,22 @@ const MatchPredictionsModal = ({ match, onClose }) => {
 
   const stateConfig = {
     // Partido finalizado
-    exact:            { color: '#00e676', bg: 'rgba(0,230,118,0.12)',  label: '🎯 Exacto',          border: 'rgba(0,230,118,0.3)',  glow: false },
-    winner:           { color: '#ffd700', bg: 'rgba(255,215,0,0.08)',  label: '✓ Ganador',          border: 'rgba(255,215,0,0.2)',  glow: false },
-    miss:             { color: '#ff5252', bg: 'rgba(255,82,82,0.06)',  label: '✗ Fallo',            border: 'rgba(255,82,82,0.1)',  glow: false },
+    exact:           { color: '#00e676', bg: 'rgba(0,230,118,0.12)',  label: '🎯 ¡Ah perro!',       border: 'rgba(0,230,118,0.3)',  glow: false },
+    winner:          { color: '#ffd700', bg: 'rgba(255,215,0,0.08)',  label: '✓ Chance le atinas',  border: 'rgba(255,215,0,0.2)',  glow: false },
+    miss:            { color: '#ff5252', bg: 'rgba(255,82,82,0.06)',  label: '✗ Ya mamó',           border: 'rgba(255,82,82,0.1)',  glow: false },
     // En vivo
-    live_exact:       { color: '#00e676', bg: 'rgba(0,230,118,0.15)', label: '🎯 Ah Perro!',    border: 'rgba(0,230,118,0.4)',  glow: true  },
-    live_possible:    { color: '#ffd700', bg: 'rgba(255,215,0,0.10)', label: '⏳ Chance le atinas',      border: 'rgba(255,215,0,0.3)',  glow: false },
-    live_impossible:  { color: '#ff5252', bg: 'rgba(255,82,82,0.06)', label: '✗ Ya mamó',     border: 'rgba(255,82,82,0.1)',  glow: false },
-    pending:          { color: '#7fb3d3', bg: 'transparent',           label: 'Pendiente',          border: 'transparent',         glow: false },
+    live_exact:      { color: '#00e676', bg: 'rgba(0,230,118,0.15)', label: '🎯 ¡Ah perro!',       border: 'rgba(0,230,118,0.4)',  glow: true  },
+    live_possible:   { color: '#ffd700', bg: 'rgba(255,215,0,0.10)', label: '⏳ Chance le atinas',  border: 'rgba(255,215,0,0.3)',  glow: false },
+    live_impossible: { color: '#ff5252', bg: 'rgba(255,82,82,0.06)', label: '✗ Ya mamó',           border: 'rgba(255,82,82,0.1)',  glow: false },
+    pending:         { color: '#7fb3d3', bg: 'transparent',           label: 'Pendiente',           border: 'transparent',         glow: false },
   }
 
-  const stateOrder = { live_exact: 0, exact: 0, live_possible: 1, winner: 1, live_impossible: 2, miss: 2, pending: 3 }
+  const stateOrder = {
+    live_exact: 0, exact: 0,
+    live_possible: 1, winner: 1,
+    live_impossible: 2, miss: 2,
+    pending: 3
+  }
 
   const sorted = [...(predictions || [])].sort((a, b) =>
     (stateOrder[getPredState(a)] ?? 3) - (stateOrder[getPredState(b)] ?? 3)
@@ -90,11 +83,11 @@ const MatchPredictionsModal = ({ match, onClose }) => {
       <DialogTitle sx={{ pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-            <Avatar src={match.home_logo} sx={{ width: 22, height: 22 }}>⚽</Avatar>
+            <TeamLogo logo={match.home_logo} name={match.team_home} size={22} />
             <Typography fontWeight={800} sx={{ fontSize: '0.9rem' }}>
               {match.team_home} vs {match.team_away}
             </Typography>
-            <Avatar src={match.away_logo} sx={{ width: 22, height: 22 }}>⚽</Avatar>
+            <TeamLogo logo={match.away_logo} name={match.team_away} size={22} />
           </Box>
 
           {hasScore && (
@@ -117,7 +110,7 @@ const MatchPredictionsModal = ({ match, onClose }) => {
 
           {isLive && (
             <Typography variant="caption" sx={{ color: '#7fb3d3', fontSize: '0.62rem' }}>
-              🟢 Ah perro! · 🟡 Chance le atinas · 🔴 Ya mamó
+              🟢 Exacto · 🟡 Chance le atinas · 🔴 Ya mamó
             </Typography>
           )}
         </Box>
@@ -145,7 +138,6 @@ const MatchPredictionsModal = ({ match, onClose }) => {
             {sorted.map((p, i) => {
               const state = getPredState(p)
               const cfg = stateConfig[state]
-
               return (
                 <Box key={i} sx={{ mb: 0.5 }}>
                   <Box sx={{
@@ -158,7 +150,6 @@ const MatchPredictionsModal = ({ match, onClose }) => {
                     boxShadow: cfg.glow ? `0 0 14px ${cfg.color}35` : 'none',
                     transition: 'all 0.3s',
                   }}>
-                    {/* Avatar + nombre */}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
                       <Avatar sx={{
                         width: 30, height: 30, fontSize: '0.8rem', fontWeight: 700,
@@ -177,7 +168,6 @@ const MatchPredictionsModal = ({ match, onClose }) => {
                       </Typography>
                     </Box>
 
-                    {/* Predicción */}
                     <Typography variant="h6" fontWeight={800} sx={{
                       fontSize: '1.1rem',
                       color: hasScore ? cfg.color : 'text.primary',
@@ -185,8 +175,7 @@ const MatchPredictionsModal = ({ match, onClose }) => {
                       {p.pred_home} - {p.pred_away}
                     </Typography>
 
-                    {/* Label */}
-                    <Box sx={{ minWidth: 95, textAlign: 'right' }}>
+                    <Box sx={{ minWidth: 110, textAlign: 'right' }}>
                       {state !== 'pending' ? (
                         <Chip label={cfg.label} size="small" sx={{
                           fontSize: '0.6rem', fontWeight: 700, height: 20,
@@ -212,15 +201,15 @@ const MatchPredictionsModal = ({ match, onClose }) => {
               }}>
                 {isLive ? (
                   <>
-                    <StatSum value={counts.live_exact || 0} label="🎯 Ah Perro!" color="#00e676" />
-                    <StatSum value={counts.live_possible || 0} label="⏳ Chance le atinas" color="#ffd700" />
-                    <StatSum value={counts.live_impossible || 0} label="✗ Mamó" color="#ff5252" />
+                    <StatSum value={counts.live_exact || 0}      label="🎯 Ah perro!"      color="#00e676" />
+                    <StatSum value={counts.live_possible || 0}   label="⏳ Chance"          color="#ffd700" />
+                    <StatSum value={counts.live_impossible || 0} label="✗ Ya mamó"         color="#ff5252" />
                   </>
                 ) : (
                   <>
-                    <StatSum value={counts.exact || 0} label="🎯 Exactos" color="#00e676" />
-                    <StatSum value={counts.winner || 0} label="✓ Ganador" color="#ffd700" />
-                    <StatSum value={counts.miss || 0} label="✗ Fallos" color="#ff5252" />
+                    <StatSum value={counts.exact || 0}  label="🎯 Ah perro!"     color="#00e676" />
+                    <StatSum value={counts.winner || 0} label="✓ Chance"         color="#ffd700" />
+                    <StatSum value={counts.miss || 0}   label="✗ Ya mamó"        color="#ff5252" />
                   </>
                 )}
               </Box>
