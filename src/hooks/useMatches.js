@@ -1,5 +1,4 @@
 // hooks/useMatches.js
-// React Query + Supabase Realtime para actualizaciones instantáneas
 import { useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabaseClient'
@@ -7,21 +6,14 @@ import { supabase } from '../services/supabaseClient'
 export const useMatches = () => {
   const queryClient = useQueryClient()
 
-  // Suscripción Realtime — se activa cuando cualquier match cambia en DB
   useEffect(() => {
     const channel = supabase
       .channel('matches-realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'matches' },
-        (payload) => {
-          // Actualiza solo el match que cambió en el cache local
-          queryClient.setQueryData(['matches'], (old) => {
-            if (!old) return old
-            return old.map(m =>
-              m.id === payload.new.id ? { ...m, ...payload.new } : m
-            )
-          })
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['matches'] })
         }
       )
       .subscribe()
@@ -39,9 +31,10 @@ export const useMatches = () => {
       if (error) throw error
       return data
     },
-    staleTime: 2 * 60 * 1000,
-    refetchInterval: 3 * 60 * 1000,        // Fallback polling cada 3 min
+    staleTime: 30 * 1000,
+    refetchInterval: 30 * 1000,
     refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   })
 }
 
@@ -58,6 +51,6 @@ export const useUpcomingMatches = () =>
       return data
     },
     staleTime: 60 * 1000,
-    refetchInterval: 2 * 60 * 1000,
+    refetchInterval: 60 * 1000,
     refetchIntervalInBackground: false,
   })
