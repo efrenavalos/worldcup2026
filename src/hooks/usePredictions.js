@@ -1,30 +1,11 @@
 // hooks/usePredictions.js
-import { useEffect } from 'react'
+// Sin Realtime — polling estable
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabaseClient'
 import { useAuth } from '../contexts/AuthContext'
 
 export const usePredictions = () => {
   const { user } = useAuth()
-  const queryClient = useQueryClient()
-
-  // Realtime: refresca predicciones cuando cambian los puntos en DB
-  useEffect(() => {
-    if (!user) return
-    const channel = supabase
-      .channel('predictions-realtime')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'predictions',
-          filter: `user_id=eq.${user.id}` },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['predictions', user.id] })
-        }
-      )
-      .subscribe()
-
-    return () => supabase.removeChannel(channel)
-  }, [user, queryClient])
 
   return useQuery({
     queryKey: ['predictions', user?.id],
@@ -44,7 +25,9 @@ export const usePredictions = () => {
       if (error) throw error
       return data
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchInterval: 30 * 1000,
+    refetchIntervalInBackground: false,
   })
 }
 
