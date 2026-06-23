@@ -8,6 +8,7 @@ import { LockClock, CheckCircle, EditNote, Edit, FiberManualRecord, People } fro
 import { formatMatchDate, isMatchLocked, timeUntilMatch } from '../utils/timezoneHelper'
 import TeamHistoryModal from './TeamHistoryModal'
 import MatchPredictionsModal from './MatchPredictionsModal'
+import TeamLogo from './TeamLogo'
 
 const LIVE_STATUSES = ['1H', 'HT', '2H', 'ET', 'P']
 
@@ -191,7 +192,13 @@ const MatchCard = ({ match, prediction, onPredict }) => {
 }
 
 const getLiveLabel = (status) => {
-  const labels = { '1H': '1er Tiempo', 'HT': 'Medio Tiempo', '2H': '2do Tiempo', 'ET': 'Prórroga', 'P': 'Penales' }
+  const labels = {
+    '1H': '1er Tiempo',
+    'HT': 'Medio Tiempo',
+    '2H': '2do Tiempo',
+    'ET': 'Prórroga',
+    'P':  'Penales',
+  }
   return labels[status] || 'En Vivo'
 }
 
@@ -204,11 +211,12 @@ const TeamDisplay = ({ name, logo, align, onClick }) => (
       transition: 'background 0.15s',
       '&:hover': { background: 'rgba(0,191,255,0.08)' },
     }}>
-      <Avatar src={logo} sx={{
-        width: 44, height: 44, background: '#0b1f3a',
-        border: '2px solid #1e3a5f',
-        '&:hover': { borderColor: '#00bfff' },
-      }}>⚽</Avatar>
+      <TeamLogo
+        logo={logo}
+        name={name}
+        size={44}
+        sx={{ '&:hover': { borderColor: '#00bfff' } }}
+      />
       <Typography variant="caption" sx={{
         fontWeight: 600, fontSize: '0.72rem', color: 'text.primary',
         textAlign: align, lineHeight: 1.2, maxWidth: 80, wordBreak: 'break-word',

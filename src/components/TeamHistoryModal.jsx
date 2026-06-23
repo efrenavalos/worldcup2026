@@ -9,6 +9,7 @@ import { Close } from '@mui/icons-material'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../services/supabaseClient'
 import { formatMatchDate } from '../utils/timezoneHelper'
+import TeamLogo from './TeamLogo'
 
 const TeamHistoryModal = ({ team, logo, onClose }) => {
   const { data: matches, isLoading } = useQuery({
@@ -44,7 +45,7 @@ const TeamHistoryModal = ({ team, logo, onClose }) => {
     <Dialog open onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Avatar src={logo} sx={{ width: 36, height: 36, background: '#0b1f3a', border: '1px solid #1e3a5f' }}>⚽</Avatar>
+          <TeamLogo logo={logo} name={team} size={36} />
           <Box>
             <Typography fontWeight={700}>{team}</Typography>
             <Typography variant="caption" color="text.secondary">Mundial 2026</Typography>
@@ -104,7 +105,7 @@ const TeamHistoryModal = ({ team, logo, onClose }) => {
                         color: resultColor, background: `${resultColor}15`,
                         border: `1px solid ${resultColor}40`,
                       }} />
-                      <Avatar src={opponentLogo} sx={{ width: 28, height: 28 }}>⚽</Avatar>
+                      <TeamLogo logo={opponentLogo} name={opponent} size={28} />
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="body2" fontWeight={600}>
                           vs {opponent}
