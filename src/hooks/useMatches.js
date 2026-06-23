@@ -1,5 +1,4 @@
 // hooks/useMatches.js
-// Sin Realtime por ahora — polling cada 15s como fallback estable
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../services/supabaseClient'
 
@@ -18,6 +17,8 @@ export const useMatches = () =>
     refetchInterval: 15 * 1000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
+    // Mantiene datos anteriores durante el refetch — evita el parpadeo
+    placeholderData: (prev) => prev,
   })
 
 export const useUpcomingMatches = () =>
@@ -35,4 +36,5 @@ export const useUpcomingMatches = () =>
     staleTime: 60 * 1000,
     refetchInterval: 60 * 1000,
     refetchIntervalInBackground: false,
+    placeholderData: (prev) => prev,
   })
