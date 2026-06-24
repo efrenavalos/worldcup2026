@@ -2,6 +2,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../services/supabaseClient'
 
+const LIVE_STATUSES = ['1H', 'HT', '2H', 'ET', 'PEN']
+
 export const useMatches = () =>
   useQuery({
     queryKey: ['matches'],
@@ -13,11 +15,14 @@ export const useMatches = () =>
       if (error) throw error
       return data
     },
-    staleTime: 15 * 1000,
-    refetchInterval: 15 * 1000,
+    staleTime: 30 * 1000,
+    // 15s si hay lives activos, 2min si no hay ninguno
+    refetchInterval: (query) => {
+      const data = query.state.data
+      return data?.some(m => LIVE_STATUSES.includes(m.status)) ? 15000 : 120000
+    },
     refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
-    // Mantiene datos anteriores durante el refetch — evita el parpadeo
+    refetchOnWindowFocus: false,   // evita refetch en cada click/cambio de tab
     placeholderData: (prev) => prev,
   })
 
@@ -34,7 +39,11 @@ export const useUpcomingMatches = () =>
       return data
     },
     staleTime: 60 * 1000,
-    refetchInterval: 60 * 1000,
+    refetchInterval: (query) => {
+      const data = query.state.data
+      return data?.some(m => LIVE_STATUSES.includes(m.status)) ? 30000 : 120000
+    },
     refetchIntervalInBackground: false,
+    refetchOnWindowFocus: false,
     placeholderData: (prev) => prev,
   })

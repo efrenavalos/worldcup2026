@@ -22,6 +22,8 @@ const Home = () => {
   const [selected, setSelected] = useState(null)
   const [tab, setTab] = useState(0)
 
+  const STATUS_ORDER = { '1H': 0, 'HT': 1, '2H': 2, 'ET': 3, 'PEN': 4 }
+
   // Solo mostrar skeletons en la carga inicial, NO durante refetch
   const loading = loadingMatches || loadingPreds
 
@@ -30,10 +32,31 @@ const Home = () => {
     return acc
   }, {})
 
-  const upcoming = (matches || []).filter(m => m.status !== 'FT')
+  const upcoming = (matches || [])
+      .filter(m => m.status !== 'FT')
+      .sort((a, b) => {
+        const aLive = STATUS_ORDER[a.status] !== undefined
+        const bLive = STATUS_ORDER[b.status] !== undefined
+
+        // Grupo: live=0, próximos=1
+        const groupA = aLive ? 0 : 1
+        const groupB = bLive ? 0 : 1
+        if (groupA !== groupB) return groupA - groupB
+
+        // Dentro de live: fixture_id fijo como tiebreaker
+        if (aLive && bLive) return a.fixture_id - b.fixture_id
+
+        // Próximos: fecha ASC, fixture_id como tiebreaker
+        const dateDiff = new Date(a.match_date) - new Date(b.match_date)
+        return dateDiff !== 0 ? dateDiff : a.fixture_id - b.fixture_id
+      })
+
   const finished = (matches || [])
-  .filter(m => m.status === 'FT')
-  .sort((a, b) => new Date(b.match_date) - new Date(a.match_date))
+    .filter(m => m.status === 'FT')
+    .sort((a, b) => {
+      const dateDiff = new Date(b.match_date) - new Date(a.match_date)
+      return dateDiff !== 0 ? dateDiff : a.fixture_id - b.fixture_id  // tiebreaker aquí también
+    })
   
   const displayMatches = tab === 0 ? upcoming : finished
 

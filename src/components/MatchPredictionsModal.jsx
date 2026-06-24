@@ -11,9 +11,25 @@ import TeamLogo from './TeamLogo'
 const LIVE_STATUSES = ['1H', 'HT', '2H', 'ET', 'P']
 
 const getLiveState = (predHome, predAway, liveHome, liveAway) => {
+  // Exacto actual
   if (predHome === liveHome && predAway === liveAway) return 'live_exact'
-  if (liveHome > predHome || liveAway > predAway) return 'live_impossible'
-  return 'live_possible'
+
+  // Determinar resultado predicho vs resultado actual
+  const predResult = predHome > predAway ? 'H' : predHome < predAway ? 'A' : 'D'
+  const liveResult = liveHome > liveAway ? 'H' : liveHome < liveAway ? 'A' : 'D'
+
+  // ¿Es imposible el marcador exacto?
+  const exactImpossible = liveHome > predHome || liveAway > predAway
+
+  if (!exactImpossible) return 'live_possible' // Aún puede ser exacto
+
+  // Exacto imposible — ¿puede aún atinar el resultado?
+  // Si el resultado predicho aún es alcanzable desde el marcador actual
+  if (predResult === 'H' && liveHome >= liveAway) return 'live_possible' // Predijo local, local va ganando o empate
+  if (predResult === 'A' && liveAway >= liveHome) return 'live_possible' // Predijo visitante, visitante va ganando o empate  
+  if (predResult === 'D' && liveHome === liveAway) return 'live_possible' // Predijo empate, está empatado
+
+  return 'live_impossible'
 }
 
 const MatchPredictionsModal = ({ match, onClose }) => {
@@ -65,7 +81,7 @@ const MatchPredictionsModal = ({ match, onClose }) => {
 
   const isFinished = status === 'FT'
   const isLive     = LIVE_STATUSES.includes(status)
-  const hasScore   = homeScore !== null && awayScore !== null && scoreConfirmed
+  const hasScore = homeScore !== null && awayScore !== null && (isLive || scoreConfirmed)
 
   const getPredState = (p) => {
     if (isFinished) {
