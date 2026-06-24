@@ -47,7 +47,13 @@ const MatchPredictionsModal = ({ match, onClose }) => {
 
   useEffect(() => {
     fetchData()
-    // Refetch cada 15s si está en vivo
+    
+    // Solo refrescar automáticamente si el partido está en vivo
+    const status = match.status
+    const isLive = ['1H', 'HT', '2H', 'ET', 'P'].includes(status)
+    
+    if (!isLive) return  // FT y NS no necesitan polling
+    
     const interval = setInterval(fetchData, 15000)
     return () => clearInterval(interval)
   }, [match.id])

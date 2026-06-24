@@ -31,7 +31,10 @@ const Home = () => {
   }, {})
 
   const upcoming = (matches || []).filter(m => m.status !== 'FT')
-  const finished = (matches || []).filter(m => m.status === 'FT')
+  const finished = (matches || [])
+  .filter(m => m.status === 'FT')
+  .sort((a, b) => new Date(b.match_date) - new Date(a.match_date))
+  
   const displayMatches = tab === 0 ? upcoming : finished
 
   return (

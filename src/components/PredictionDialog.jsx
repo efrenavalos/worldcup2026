@@ -1,5 +1,5 @@
 // components/PredictionDialog.jsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog, DialogContent, DialogTitle, DialogActions,
   Box, Typography, TextField, Button, Avatar,
@@ -10,7 +10,7 @@ import { useSavePrediction } from '../hooks/usePredictions'
 import { formatMatchDateLong } from '../utils/timezoneHelper'
 import TeamHistoryModal from './TeamHistoryModal'
 
-const PredictionDialog = ({ open, match, onClose }) => {
+const PredictionDialog = ({ open, match, existingPrediction, onClose }) => {
   const [predHome, setPredHome] = useState('')
   const [predAway, setPredAway] = useState('')
   const [step, setStep] = useState('input')
@@ -18,6 +18,20 @@ const PredictionDialog = ({ open, match, onClose }) => {
   const [teamHistory, setTeamHistory] = useState(null) // { team, logo }
 
   const { mutate: savePrediction, isPending } = useSavePrediction()
+  const isEditing = !!existingPrediction
+
+  // ← AGREGA ESTO AQUÍ
+  useEffect(() => {
+    if (open && existingPrediction) {
+      setPredHome(String(existingPrediction.pred_home))
+      setPredAway(String(existingPrediction.pred_away))
+    } else if (open && !existingPrediction) {
+      setPredHome('')
+      setPredAway('')
+    }
+    setStep('input')
+    setError(null)
+  }, [open, existingPrediction])
 
   const handleClose = () => {
     setPredHome('')
