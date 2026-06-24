@@ -70,7 +70,7 @@ const MatchPredictionsModal = ({ match, onClose }) => {
     
     if (!isLive) return  // FT y NS no necesitan polling
     
-    const interval = setInterval(fetchData, 15000)
+    const interval = setInterval(fetchData, 30000)
     return () => clearInterval(interval)
   }, [match.id])
 
