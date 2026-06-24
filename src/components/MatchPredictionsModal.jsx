@@ -1,16 +1,14 @@
 // components/MatchPredictionsModal.jsx
+import { useEffect, useState } from 'react'
 import {
   Dialog, DialogTitle, DialogContent, Box, Typography,
-  Avatar, Chip, IconButton, Divider, CircularProgress,
+  Avatar, Chip, IconButton, CircularProgress,
 } from '@mui/material'
 import { Close } from '@mui/icons-material'
-import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../services/supabaseClient'
 import TeamLogo from './TeamLogo'
 
 const LIVE_STATUSES = ['1H', 'HT', '2H', 'ET', 'P']
-
-const getOutcome = (h, a) => h > a ? 'home' : h < a ? 'away' : 'draw'
 
 const getLiveState = (predHome, predAway, liveHome, liveAway) => {
   if (predHome === liveHome && predAway === liveAway) return 'live_exact'
@@ -19,22 +17,49 @@ const getLiveState = (predHome, predAway, liveHome, liveAway) => {
 }
 
 const MatchPredictionsModal = ({ match, onClose }) => {
-  const isFinished = match.status === 'FT'
-  const isLive = LIVE_STATUSES.includes(match.status)
-  const hasScore = match.home_score !== null && match.away_score !== null
+  const [matchData, setMatchData] = useState(null)
+  const [predictions, setPredictions] = useState(null)
+  const [loading, setLoading] = useState(true)
 
-  const { data: predictions, isLoading } = useQuery({
-    queryKey: ['match-predictions', match.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
+  // Fetch directo sin React Query — garantiza datos frescos
+  const fetchData = async () => {
+    setLoading(true)
+    try {
+      // Status fresco del partido
+      const { data: m } = await supabase
+        .from('matches')
+        .select('status, home_score, away_score, score_confirmed')
+        .eq('id', match.id)
+        .single()
+
+      // Predicciones frescas con puntos
+      const { data: p } = await supabase
         .from('predictions')
         .select(`pred_home, pred_away, points_awarded, profiles ( name )`)
         .eq('match_id', match.id)
-      if (error) throw error
-      return data
-    },
-    refetchInterval: isLive ? 30 * 1000 : false,
-  })
+
+      setMatchData(m)
+      setPredictions(p)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchData()
+    // Refetch cada 15s si está en vivo
+    const interval = setInterval(fetchData, 15000)
+    return () => clearInterval(interval)
+  }, [match.id])
+
+  const status         = matchData?.status ?? match.status
+  const homeScore      = matchData?.home_score ?? match.home_score
+  const awayScore      = matchData?.away_score ?? match.away_score
+  const scoreConfirmed = matchData?.score_confirmed ?? match.score_confirmed
+
+  const isFinished = status === 'FT'
+  const isLive     = LIVE_STATUSES.includes(status)
+  const hasScore   = homeScore !== null && awayScore !== null && scoreConfirmed
 
   const getPredState = (p) => {
     if (isFinished) {
@@ -44,29 +69,23 @@ const MatchPredictionsModal = ({ match, onClose }) => {
       return 'pending'
     }
     if (isLive && hasScore) {
-      return getLiveState(p.pred_home, p.pred_away, match.home_score, match.away_score)
+      return getLiveState(p.pred_home, p.pred_away, homeScore, awayScore)
     }
     return 'pending'
   }
 
-  const stateConfig = {
-    // Partido finalizado
-    exact:           { color: '#00e676', bg: 'rgba(0,230,118,0.12)',  label: '🎯 ¡Ah perro!',       border: 'rgba(0,230,118,0.3)',  glow: false },
-    winner:          { color: '#ffd700', bg: 'rgba(255,215,0,0.08)',  label: '✓ Chance le atinas',  border: 'rgba(255,215,0,0.2)',  glow: false },
-    miss:            { color: '#ff5252', bg: 'rgba(255,82,82,0.06)',  label: '✗ Ya mamó',           border: 'rgba(255,82,82,0.1)',  glow: false },
-    // En vivo
-    live_exact:      { color: '#00e676', bg: 'rgba(0,230,118,0.15)', label: '🎯 ¡Ah perro!',       border: 'rgba(0,230,118,0.4)',  glow: true  },
-    live_possible:   { color: '#ffd700', bg: 'rgba(255,215,0,0.10)', label: '⏳ Chance le atinas',  border: 'rgba(255,215,0,0.3)',  glow: false },
-    live_impossible: { color: '#ff5252', bg: 'rgba(255,82,82,0.06)', label: '✗ Ya mamó',           border: 'rgba(255,82,82,0.1)',  glow: false },
-    pending:         { color: '#7fb3d3', bg: 'transparent',           label: 'Pendiente',           border: 'transparent',         glow: false },
-  }
-
-  const stateOrder = {
-    live_exact: 0, exact: 0,
-    live_possible: 1, winner: 1,
-    live_impossible: 2, miss: 2,
-    pending: 3
-  }
+const stateConfig = {
+  // Partido FINALIZADO
+  exact:           { color: '#00e676', bg: 'rgba(0,230,118,0.12)',  label: '🎯 ¡Ah perro!',       border: 'rgba(0,230,118,0.3)',  glow: true  },
+  winner:          { color: '#ffd700', bg: 'rgba(255,215,0,0.08)',  label: '✓ Le atinaste',        border: 'rgba(255,215,0,0.2)',  glow: false },
+  miss:            { color: '#ff5252', bg: 'rgba(255,82,82,0.06)',  label: '✗ Ya mamó',            border: 'rgba(255,82,82,0.1)',  glow: false },
+  // EN VIVO
+  live_exact:      { color: '#00e676', bg: 'rgba(0,230,118,0.15)', label: '🎯 ¡Ah perro!',        border: 'rgba(0,230,118,0.4)',  glow: true  },
+  live_possible:   { color: '#ffd700', bg: 'rgba(255,215,0,0.10)', label: '⏳ Chance le atinas',   border: 'rgba(255,215,0,0.3)',  glow: false },
+  live_impossible: { color: '#ff5252', bg: 'rgba(255,82,82,0.06)', label: '✗ Ya mamó',            border: 'rgba(255,82,82,0.1)',  glow: false },
+  pending:         { color: '#7fb3d3', bg: 'transparent',           label: 'Pendiente',            border: 'transparent',         glow: false },
+}
+  const stateOrder = { live_exact: 0, exact: 0, live_possible: 1, winner: 1, live_impossible: 2, miss: 2, pending: 3 }
 
   const sorted = [...(predictions || [])].sort((a, b) =>
     (stateOrder[getPredState(a)] ?? 3) - (stateOrder[getPredState(b)] ?? 3)
@@ -92,33 +111,33 @@ const MatchPredictionsModal = ({ match, onClose }) => {
 
           {hasScore && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="body2" color="text.secondary">Marcador:</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {isFinished ? 'Resultado final:' : 'Marcador:'}
+              </Typography>
               <Typography variant="body1" fontWeight={800}
                 sx={{ color: isLive ? '#00e676' : 'text.primary' }}>
-                {match.home_score} - {match.away_score}
+                {homeScore} - {awayScore}
               </Typography>
               {isLive && (
                 <Chip label="● EN VIVO" size="small" sx={{
                   fontSize: '0.6rem', height: 18, fontWeight: 700,
                   color: '#00e676', background: 'rgba(0,230,118,0.15)',
-                  animation: 'blink 1.5s ease-in-out infinite',
-                  '@keyframes blink': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.5 } },
+                }} />
+              )}
+              {isFinished && (
+                <Chip label="FT" size="small" sx={{
+                  fontSize: '0.6rem', height: 18, fontWeight: 700,
+                  color: '#4a7a9b', background: 'rgba(74,122,155,0.15)',
                 }} />
               )}
             </Box>
-          )}
-
-          {isLive && (
-            <Typography variant="caption" sx={{ color: '#7fb3d3', fontSize: '0.62rem' }}>
-              🟢 Exacto · 🟡 Chance le atinas · 🔴 Ya mamó
-            </Typography>
           )}
         </Box>
         <IconButton onClick={onClose} size="small"><Close fontSize="small" /></IconButton>
       </DialogTitle>
 
       <DialogContent sx={{ pt: 1 }}>
-        {isLoading ? (
+        {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <CircularProgress color="primary" size={28} />
           </Box>
@@ -153,16 +172,17 @@ const MatchPredictionsModal = ({ match, onClose }) => {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
                       <Avatar sx={{
                         width: 30, height: 30, fontSize: '0.8rem', fontWeight: 700,
-                        background: cfg.glow
+                        background: state === 'exact' || state === 'live_exact'
                           ? 'linear-gradient(135deg, #00e676, #00b248)'
-                          : state === 'live_possible' || state === 'winner'
+                          : state === 'winner' || state === 'live_possible'
                           ? 'linear-gradient(135deg, #ffd700, #cc9900)'
                           : '#1e3a5f',
                         boxShadow: cfg.glow ? '0 0 8px rgba(0,230,118,0.5)' : 'none',
                       }}>
                         {p.profiles?.name?.[0]?.toUpperCase() || '?'}
                       </Avatar>
-                      <Typography variant="body2" fontWeight={cfg.glow ? 800 : 600}
+                      <Typography variant="body2"
+                        fontWeight={cfg.glow ? 800 : 600}
                         sx={{ color: cfg.glow ? '#00e676' : 'text.primary' }}>
                         {p.profiles?.name || 'Jugador'}
                       </Typography>
@@ -192,7 +212,6 @@ const MatchPredictionsModal = ({ match, onClose }) => {
               )
             })}
 
-            {/* Resumen */}
             {hasScore && predictions?.length > 0 && (
               <Box sx={{
                 mt: 2, p: 1.5, background: '#0b1f3a',
@@ -201,15 +220,15 @@ const MatchPredictionsModal = ({ match, onClose }) => {
               }}>
                 {isLive ? (
                   <>
-                    <StatSum value={counts.live_exact || 0}      label="🎯 Ah perro!"      color="#00e676" />
-                    <StatSum value={counts.live_possible || 0}   label="⏳ Chance"          color="#ffd700" />
-                    <StatSum value={counts.live_impossible || 0} label="✗ Ya mamó"         color="#ff5252" />
+                    <StatSum value={counts.live_exact || 0}      label="🎯 Ah perro!"  color="#00e676" />
+                    <StatSum value={counts.live_possible || 0}   label="⏳ Chance"      color="#ffd700" />
+                    <StatSum value={counts.live_impossible || 0} label="✗ Ya mamó"     color="#ff5252" />
                   </>
                 ) : (
                   <>
-                    <StatSum value={counts.exact || 0}  label="🎯 Ah perro!"     color="#00e676" />
-                    <StatSum value={counts.winner || 0} label="✓ Chance"         color="#ffd700" />
-                    <StatSum value={counts.miss || 0}   label="✗ Ya mamó"        color="#ff5252" />
+                    <StatSum value={counts.exact || 0}  label="🎯 Ah perro!"  color="#00e676" />
+                    <StatSum value={counts.winner || 0} label="✓ Chance"      color="#ffd700" />
+                    <StatSum value={counts.miss || 0}   label="✗ Ya mamó"     color="#ff5252" />
                   </>
                 )}
               </Box>
