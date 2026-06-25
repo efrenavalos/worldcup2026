@@ -14,7 +14,11 @@ const MEDALS = ['🥇', '🥈', '🥉']
 const LeaderboardTable = ({ standings = [], currentUserId }) => {
   const [detailModal, setDetailModal] = useState(null) // { userId, name, type: 'exact'|'winner' }
 
-  const sorted = [...standings].sort((a, b) => b.total_points - a.total_points)
+  const sorted = [...standings].sort((a, b) => {
+  if (b.total_points !== a.total_points) return b.total_points - a.total_points  // 1. Puntos
+  if (b.exact_hits !== a.exact_hits) return b.exact_hits - a.exact_hits          // 2. Exactos
+  return b.winner_hits - a.winner_hits                                            // 3. Ganador
+})
 
   return (
     <>
