@@ -41,7 +41,7 @@ const LeaderboardTable = ({ standings = [], currentUserId }) => {
           <TableBody>
             {sorted.map((row, idx) => {
               const isCurrentUser = row.user_id === currentUserId
-              const isTop3 = idx < 3
+              const isTop3 = idx < 3 && row.total_points > 0
               return (
                 <TableRow key={row.user_id} sx={{
                   background: isCurrentUser ? 'rgba(0,191,255,0.07)' : 'transparent',
