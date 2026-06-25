@@ -7,24 +7,47 @@ import { useAuth } from '../contexts/AuthContext'
 import MatchCard from '../components/MatchCard'
 import PredictionDialog from '../components/PredictionDialog'
 
+const STATUS_ORDER = { '1H': 0, 'HT': 1, '2H': 2, 'ET': 3, 'PEN': 4 }
+
+const STAGE_ORDER = ['GROUP_STAGE', 'LAST_32', 'LAST_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'THIRD_PLACE', 'FINAL']
+
+const STAGE_CONFIG = {
+  GROUP_STAGE:    { label: 'Fase de Grupos',   color: '#00bfff' },
+  LAST_32:        { label: '16avos de Final',   color: '#00e0b0' },
+  LAST_16:        { label: 'Octavos de Final',  color: '#ffd700' },
+  QUARTER_FINALS: { label: 'Cuartos de Final',  color: '#ff9800' },
+  SEMI_FINALS:    { label: 'Semifinales',       color: '#cc66ff' },
+  THIRD_PLACE:    { label: 'Tercer Lugar',      color: '#a0a0a0' },
+  FINAL:          { label: '🏆 Gran Final',     color: '#ff4444' },
+}
+
+const sortMatches = (arr) =>
+  [...arr].sort((a, b) => {
+    const aLive = STATUS_ORDER[a.status] !== undefined
+    const bLive = STATUS_ORDER[b.status] !== undefined
+    const groupA = aLive ? 0 : 1
+    const groupB = bLive ? 0 : 1
+    if (groupA !== groupB) return groupA - groupB
+    if (aLive && bLive) return a.fixture_id - b.fixture_id
+    const dateDiff = new Date(a.match_date) - new Date(b.match_date)
+    return dateDiff !== 0 ? dateDiff : a.fixture_id - b.fixture_id
+  })
+
 const Home = () => {
   const { profile } = useAuth()
   const {
     data: matches,
-    isLoading: loadingMatches,  // true solo la primera carga
+    isLoading: loadingMatches,
     error: matchError
   } = useMatches()
   const {
     data: predictions,
-    isLoading: loadingPreds     // true solo la primera carga
+    isLoading: loadingPreds
   } = usePredictions()
 
   const [selected, setSelected] = useState(null)
   const [tab, setTab] = useState(0)
 
-  const STATUS_ORDER = { '1H': 0, 'HT': 1, '2H': 2, 'ET': 3, 'PEN': 4 }
-
-  // Solo mostrar skeletons en la carga inicial, NO durante refetch
   const loading = loadingMatches || loadingPreds
 
   const predictionMap = (predictions || []).reduce((acc, p) => {
@@ -32,33 +55,25 @@ const Home = () => {
     return acc
   }, {})
 
-  const upcoming = (matches || [])
-      .filter(m => m.status !== 'FT')
-      .sort((a, b) => {
-        const aLive = STATUS_ORDER[a.status] !== undefined
-        const bLive = STATUS_ORDER[b.status] !== undefined
+  const upcomingAll = (matches || []).filter(m => m.status !== 'FT')
 
-        // Grupo: live=0, próximos=1
-        const groupA = aLive ? 0 : 1
-        const groupB = bLive ? 0 : 1
-        if (groupA !== groupB) return groupA - groupB
+  // Agrupar upcoming por stage en orden correcto
+  const upcomingByStage = STAGE_ORDER.reduce((acc, stage) => {
+    const group = sortMatches(upcomingAll.filter(m => m.stage === stage))
+    if (group.length > 0) acc.push({ stage, matches: group })
+    return acc
+  }, [])
 
-        // Dentro de live: fixture_id fijo como tiebreaker
-        if (aLive && bLive) return a.fixture_id - b.fixture_id
-
-        // Próximos: fecha ASC, fixture_id como tiebreaker
-        const dateDiff = new Date(a.match_date) - new Date(b.match_date)
-        return dateDiff !== 0 ? dateDiff : a.fixture_id - b.fixture_id
-      })
+  // Partidos sin stage asignado — agrupar al final
+  const noStage = sortMatches(upcomingAll.filter(m => !m.stage))
+  if (noStage.length > 0) upcomingByStage.push({ stage: null, matches: noStage })
 
   const finished = (matches || [])
     .filter(m => m.status === 'FT')
     .sort((a, b) => {
       const dateDiff = new Date(b.match_date) - new Date(a.match_date)
-      return dateDiff !== 0 ? dateDiff : a.fixture_id - b.fixture_id  // tiebreaker aquí también
+      return dateDiff !== 0 ? dateDiff : a.fixture_id - b.fixture_id
     })
-  
-  const displayMatches = tab === 0 ? upcoming : finished
 
   return (
     <Box sx={{ maxWidth: 640, mx: 'auto', px: 2, py: 3 }}>
@@ -76,7 +91,7 @@ const Home = () => {
         '& .MuiTabs-indicator': { backgroundColor: 'primary.main' },
         '& .MuiTab-root': { fontWeight: 600, textTransform: 'none', minWidth: 0 },
       }}>
-        <Tab label={`Próximos (${upcoming.length})`} />
+        <Tab label={`Próximos (${upcomingAll.length})`} />
         <Tab label={`Finalizados (${finished.length})`} />
       </Tabs>
 
@@ -87,23 +102,61 @@ const Home = () => {
         <Skeleton key={i} variant="rounded" height={160} sx={{ mb: 2, borderRadius: 2 }} />
       ))}
 
-      {/* Cards — se mantienen visibles durante refetch gracias a placeholderData */}
-      {!loading && displayMatches.map((match) => (
-        <MatchCard
-          key={match.id}
-          match={match}
-          prediction={predictionMap[match.id] || null}
-          onPredict={(m, p) => setSelected({ match: m, prediction: p })}
-        />
-      ))}
+      {/* Tab Próximos — agrupado por stage */}
+      {!loading && tab === 0 && (
+        upcomingByStage.length === 0 ? (
+          <Box sx={{ textAlign: 'center', py: 8 }}>
+            <Typography sx={{ fontSize: 40 }}>⚽</Typography>
+            <Typography color="text.secondary" mt={1}>No hay partidos próximos.</Typography>
+          </Box>
+        ) : (
+          upcomingByStage.map(({ stage, matches: group }) => {
+            const cfg = STAGE_CONFIG[stage] || { label: 'Otros', color: '#7fb3d3' }
+            return (
+              <Box key={stage ?? 'none'} sx={{ mb: 3 }}>
+                {/* Separador con label de stage */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+                  <Box sx={{ flex: 1, height: '1px', background: `${cfg.color}30` }} />
+                  <Typography variant="caption" sx={{
+                    fontWeight: 700, fontSize: '0.7rem', letterSpacing: 1.5,
+                    color: cfg.color, textTransform: 'uppercase', whiteSpace: 'nowrap',
+                  }}>
+                    {cfg.label}
+                  </Typography>
+                  <Box sx={{ flex: 1, height: '1px', background: `${cfg.color}30` }} />
+                </Box>
 
-      {!loading && displayMatches.length === 0 && (
-        <Box sx={{ textAlign: 'center', py: 8 }}>
-          <Typography sx={{ fontSize: 40 }}>⚽</Typography>
-          <Typography color="text.secondary" mt={1}>
-            {tab === 0 ? 'No hay partidos próximos.' : 'No hay partidos finalizados aún.'}
-          </Typography>
-        </Box>
+                {group.map(match => (
+                  <MatchCard
+                    key={match.id}
+                    match={match}
+                    prediction={predictionMap[match.id] || null}
+                    onPredict={(m, p) => setSelected({ match: m, prediction: p })}
+                  />
+                ))}
+              </Box>
+            )
+          })
+        )
+      )}
+
+      {/* Tab Finalizados — sin agrupar, orden cronológico inverso */}
+      {!loading && tab === 1 && (
+        finished.length === 0 ? (
+          <Box sx={{ textAlign: 'center', py: 8 }}>
+            <Typography sx={{ fontSize: 40 }}>⚽</Typography>
+            <Typography color="text.secondary" mt={1}>No hay partidos finalizados aún.</Typography>
+          </Box>
+        ) : (
+          finished.map(match => (
+            <MatchCard
+              key={match.id}
+              match={match}
+              prediction={predictionMap[match.id] || null}
+              onPredict={(m, p) => setSelected({ match: m, prediction: p })}
+            />
+          ))
+        )
       )}
 
       <PredictionDialog

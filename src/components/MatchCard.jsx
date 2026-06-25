@@ -12,6 +12,16 @@ import TeamLogo from './TeamLogo'
 
 const LIVE_STATUSES = ['1H', 'HT', '2H', 'ET', 'P']
 
+const STAGE_COLORS = {
+  GROUP_STAGE:    null,        // sin borde especial — usa el default
+  LAST_32:        '#00e0b0',   // verde agua
+  LAST_16:        '#ffd700',   // dorado
+  QUARTER_FINALS: '#ff9800',   // naranja
+  SEMI_FINALS:    '#cc66ff',   // morado
+  THIRD_PLACE:    '#a0a0a0',   // gris
+  FINAL:          '#ff4444',   // rojo
+}
+
 const MatchCard = ({ match, prediction, onPredict }) => {
   const isLive = LIVE_STATUSES.includes(match.status)
   const isFinished = match.status === 'FT'
@@ -21,33 +31,51 @@ const MatchCard = ({ match, prediction, onPredict }) => {
   const [teamHistory, setTeamHistory] = useState(null)
   const [showPredictions, setShowPredictions] = useState(false)
 
-  // Mostrar marcador si:
-  // 1. Partido terminado (FT)
-  // 2. En vivo Y score_confirmed = true (la API confirmó el marcador, aunque sea 0-0)
   const showScore = isFinished || (isLive && match.score_confirmed === true)
-
-  // Mientras en vivo pero sin confirmación aún → mostrar animación
   const showLiveAnimation = isLive && !match.score_confirmed
 
+  // Color de borde según stage
+  const stageColor = STAGE_COLORS[match.stage] ?? null
+  const isElimination = !!stageColor
+
   const getStatusChip = () => {
-    if (isFinished) return { label: 'Finalizado', color: '#4a7a9b', bg: 'rgba(74,122,155,0.15)', live: false }
-    if (isLive)     return { label: getLiveLabel(match.status), color: '#00e676', bg: 'rgba(0,230,118,0.1)', live: true }
-    if (locked)     return { label: 'Iniciando pronto', color: '#ffd700', bg: 'rgba(255,215,0,0.1)', live: false }
-    return { label: timeUntilMatch(match.match_date), color: '#00bfff', bg: 'rgba(0,191,255,0.1)', live: false }
+    if (isFinished) return { label: 'Finalizado',       color: '#4a7a9b', bg: 'rgba(74,122,155,0.15)',  live: false }
+    if (isLive)     return { label: getLiveLabel(match.status), color: '#00e676', bg: 'rgba(0,230,118,0.1)', live: true  }
+    if (locked)     return { label: 'Iniciando pronto', color: '#ffd700', bg: 'rgba(255,215,0,0.1)',    live: false }
+    return { label: timeUntilMatch(match.match_date),   color: '#00bfff', bg: 'rgba(0,191,255,0.1)',   live: false }
   }
 
   const status = getStatusChip()
+
+  // Borde y sombra según prioridad: live > stage > default
+  const borderColor = isLive
+    ? 'rgba(0,230,118,0.4)'
+    : isElimination
+    ? `${stageColor}60`
+    : '#1e3a5f'
+
+  const boxShadow = isLive
+    ? '0 0 20px rgba(0,230,118,0.1)'
+    : isElimination
+    ? `0 0 14px ${stageColor}18`
+    : 'none'
+
+  const hoverShadow = isLive
+    ? '0 0 28px rgba(0,230,118,0.2)'
+    : isElimination
+    ? `0 0 22px ${stageColor}28`
+    : '0 8px 32px rgba(0,191,255,0.12)'
 
   return (
     <>
       <Card sx={{
         mb: 2,
         transition: 'transform 0.15s, box-shadow 0.15s',
-        border: isLive ? '1px solid rgba(0,230,118,0.4)' : '1px solid #1e3a5f',
-        boxShadow: isLive ? '0 0 20px rgba(0,230,118,0.1)' : 'none',
+        border: `1px solid ${borderColor}`,
+        boxShadow,
         '&:hover': {
           transform: 'translateY(-2px)',
-          boxShadow: isLive ? '0 0 28px rgba(0,230,118,0.2)' : '0 8px 32px rgba(0,191,255,0.12)',
+          boxShadow: hoverShadow,
         },
       }}>
         <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
@@ -114,7 +142,6 @@ const MatchCard = ({ match, prediction, onPredict }) => {
                   )}
                 </Box>
               ) : showLiveAnimation ? (
-                // En vivo pero cron aún no confirmó el marcador
                 <Box>
                   <Typography variant="h5" sx={{
                     fontWeight: 700, color: '#00e676', letterSpacing: 4,
@@ -193,11 +220,8 @@ const MatchCard = ({ match, prediction, onPredict }) => {
 
 const getLiveLabel = (status) => {
   const labels = {
-    '1H': '1er Tiempo',
-    'HT': 'Medio Tiempo',
-    '2H': '2do Tiempo',
-    'ET': 'Prórroga',
-    'P':  'Penales',
+    '1H': '1er Tiempo', 'HT': 'Medio Tiempo',
+    '2H': '2do Tiempo', 'ET': 'Prórroga', 'P': 'Penales',
   }
   return labels[status] || 'En Vivo'
 }
@@ -211,12 +235,8 @@ const TeamDisplay = ({ name, logo, align, onClick }) => (
       transition: 'background 0.15s',
       '&:hover': { background: 'rgba(0,191,255,0.08)' },
     }}>
-      <TeamLogo
-        logo={logo}
-        name={name}
-        size={44}
-        sx={{ '&:hover': { borderColor: '#00bfff' } }}
-      />
+      <TeamLogo logo={logo} name={name} size={44}
+        sx={{ '&:hover': { borderColor: '#00bfff' } }} />
       <Typography variant="caption" sx={{
         fontWeight: 600, fontSize: '0.72rem', color: 'text.primary',
         textAlign: align, lineHeight: 1.2, maxWidth: 80, wordBreak: 'break-word',
