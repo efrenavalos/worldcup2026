@@ -12,7 +12,9 @@ import { useAuth } from './contexts/AuthContext'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      retry: 2,                    // era 1 — reintenta 2 veces
+      retryDelay: 1000,            // 1s entre intentos
+      networkMode: 'offlineFirst', // no bloquea render esperando red
       refetchOnWindowFocus: false,
     },
   },
