@@ -4,58 +4,59 @@ import {
   Dialog, DialogTitle, DialogContent, Box, Typography,
   Avatar, Chip, IconButton, CircularProgress,
 } from '@mui/material'
-import { Close } from '@mui/icons-material'
+import { Close, VisibilityOff } from '@mui/icons-material'
 import { supabase } from '../services/supabaseClient'
+import { useAuth } from '../contexts/AuthContext'
 import TeamLogo from './TeamLogo'
 
 const LIVE_STATUSES = ['1H', 'HT', '2H', 'ET', 'P']
 
 const getLiveState = (predHome, predAway, liveHome, liveAway) => {
-  // Exacto actual
   if (predHome === liveHome && predAway === liveAway) return 'live_exact'
 
-  // Determinar resultado predicho vs resultado actual
   const predResult = predHome > predAway ? 'H' : predHome < predAway ? 'A' : 'D'
-  const liveResult = liveHome > liveAway ? 'H' : liveHome < liveAway ? 'A' : 'D'
-
-  // ¿Es imposible el marcador exacto?
   const exactImpossible = liveHome > predHome || liveAway > predAway
 
-  if (!exactImpossible) return 'live_possible' // Aún puede ser exacto
+  if (!exactImpossible) return 'live_possible'
 
-  // Exacto imposible — ¿puede aún atinar el resultado?
-  // Si el resultado predicho aún es alcanzable desde el marcador actual
-  if (predResult === 'H' && liveHome >= liveAway) return 'live_possible' // Predijo local, local va ganando o empate
-  if (predResult === 'A' && liveAway >= liveHome) return 'live_possible' // Predijo visitante, visitante va ganando o empate  
-  if (predResult === 'D' && liveHome === liveAway) return 'live_possible' // Predijo empate, está empatado
+  if (predResult === 'H' && liveHome >= liveAway) return 'live_possible'
+  if (predResult === 'A' && liveAway >= liveHome) return 'live_possible'
+  if (predResult === 'D' && liveHome === liveAway) return 'live_possible'
 
   return 'live_impossible'
 }
 
 const MatchPredictionsModal = ({ match, onClose }) => {
-  const [matchData, setMatchData] = useState(null)
+  const { profile } = useAuth()
+  const [matchData, setMatchData]   = useState(null)
   const [predictions, setPredictions] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [showOthers, setShowOthers] = useState(true)
+  const [loading, setLoading]       = useState(true)
 
-  // Fetch directo sin React Query — garantiza datos frescos
   const fetchData = async () => {
     setLoading(true)
     try {
-      // Status fresco del partido
       const { data: m } = await supabase
         .from('matches')
         .select('status, home_score, away_score, score_confirmed')
         .eq('id', match.id)
         .single()
 
-      // Predicciones frescas con puntos
       const { data: p } = await supabase
         .from('predictions')
-        .select(`pred_home, pred_away, points_awarded, profiles ( name )`)
+        .select(`pred_home, pred_away, points_awarded, profiles ( id, name )`)
         .eq('match_id', match.id)
+
+      // Leer flag de visibilidad
+      const { data: cfg } = await supabase
+        .from('app_config')
+        .select('value')
+        .eq('key', 'show_others_predictions')
+        .single()
 
       setMatchData(m)
       setPredictions(p)
+      setShowOthers(cfg?.value === 'true')
     } finally {
       setLoading(false)
     }
@@ -63,13 +64,10 @@ const MatchPredictionsModal = ({ match, onClose }) => {
 
   useEffect(() => {
     fetchData()
-    
-    // Solo refrescar automáticamente si el partido está en vivo
-    const status = match.status
-    const isLive = ['1H', 'HT', '2H', 'ET', 'P'].includes(status)
-    
-    if (!isLive) return  // FT y NS no necesitan polling
-    
+
+    const isLive = ['1H', 'HT', '2H', 'ET', 'P'].includes(match.status)
+    if (!isLive) return
+
     const interval = setInterval(fetchData, 30000)
     return () => clearInterval(interval)
   }, [match.id])
@@ -81,7 +79,7 @@ const MatchPredictionsModal = ({ match, onClose }) => {
 
   const isFinished = status === 'FT'
   const isLive     = LIVE_STATUSES.includes(status)
-  const hasScore = homeScore !== null && awayScore !== null && (isLive || scoreConfirmed)
+  const hasScore   = homeScore !== null && awayScore !== null && (isLive || scoreConfirmed)
 
   const getPredState = (p) => {
     if (isFinished) {
@@ -96,22 +94,27 @@ const MatchPredictionsModal = ({ match, onClose }) => {
     return 'pending'
   }
 
-const stateConfig = {
-  // Partido FINALIZADO
-  exact:           { color: '#00e676', bg: 'rgba(0,230,118,0.12)',  label: '🎯 ¡Ah perro!',       border: 'rgba(0,230,118,0.3)',  glow: true  },
-  winner:          { color: '#ffd700', bg: 'rgba(255,215,0,0.08)',  label: '✓ Le atinaste',        border: 'rgba(255,215,0,0.2)',  glow: false },
-  miss:            { color: '#ff5252', bg: 'rgba(255,82,82,0.06)',  label: '✗ Ya mamó',            border: 'rgba(255,82,82,0.1)',  glow: false },
-  // EN VIVO
-  live_exact:      { color: '#00e676', bg: 'rgba(0,230,118,0.15)', label: '🎯 ¡Ah perro!',        border: 'rgba(0,230,118,0.4)',  glow: true  },
-  live_possible:   { color: '#ffd700', bg: 'rgba(255,215,0,0.10)', label: '⏳ Chance le atinas',   border: 'rgba(255,215,0,0.3)',  glow: false },
-  live_impossible: { color: '#ff5252', bg: 'rgba(255,82,82,0.06)', label: '✗ Ya mamó',            border: 'rgba(255,82,82,0.1)',  glow: false },
-  pending:         { color: '#7fb3d3', bg: 'transparent',           label: 'Pendiente',            border: 'transparent',         glow: false },
-}
+  const stateConfig = {
+    exact:           { color: '#00e676', bg: 'rgba(0,230,118,0.12)',  label: '🎯 ¡Ah perro!',     border: 'rgba(0,230,118,0.3)',  glow: true  },
+    winner:          { color: '#ffd700', bg: 'rgba(255,215,0,0.08)',  label: '✓ Le atinaste',      border: 'rgba(255,215,0,0.2)',  glow: false },
+    miss:            { color: '#ff5252', bg: 'rgba(255,82,82,0.06)',  label: '✗ Ya mamó',          border: 'rgba(255,82,82,0.1)',  glow: false },
+    live_exact:      { color: '#00e676', bg: 'rgba(0,230,118,0.15)', label: '🎯 ¡Ah perro!',      border: 'rgba(0,230,118,0.4)',  glow: true  },
+    live_possible:   { color: '#ffd700', bg: 'rgba(255,215,0,0.10)', label: '⏳ Chance le atinas', border: 'rgba(255,215,0,0.3)',  glow: false },
+    live_impossible: { color: '#ff5252', bg: 'rgba(255,82,82,0.06)', label: '✗ Ya mamó',          border: 'rgba(255,82,82,0.1)',  glow: false },
+    pending:         { color: '#7fb3d3', bg: 'transparent',           label: 'Pendiente',          border: 'transparent',         glow: false },
+  }
+
   const stateOrder = { live_exact: 0, exact: 0, live_possible: 1, winner: 1, live_impossible: 2, miss: 2, pending: 3 }
 
-  const sorted = [...(predictions || [])].sort((a, b) =>
+  const allSorted = [...(predictions || [])].sort((a, b) =>
     (stateOrder[getPredState(a)] ?? 3) - (stateOrder[getPredState(b)] ?? 3)
   )
+
+  // Si show_others está apagado, solo mostrar la predicción del usuario actual
+  const isAdmin = profile?.is_admin
+  const visiblePredictions = (showOthers || isAdmin)
+    ? allSorted
+    : allSorted.filter(p => p.profiles?.id === profile?.id)
 
   const counts = (predictions || []).reduce((acc, p) => {
     const s = getPredState(p)
@@ -174,9 +177,17 @@ const stateConfig = {
           <>
             <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
               {predictions?.length} predicción{predictions?.length !== 1 ? 'es' : ''}
+              {!showOthers && !isAdmin && (
+                <Chip
+                  icon={<VisibilityOff sx={{ fontSize: '0.7rem !important' }} />}
+                  label="Predicciones ocultas"
+                  size="small"
+                  sx={{ ml: 1, fontSize: '0.6rem', height: 18, color: '#7fb3d3', background: 'rgba(127,179,211,0.1)' }}
+                />
+              )}
             </Typography>
 
-            {sorted.map((p, i) => {
+            {visiblePredictions.map((p, i) => {
               const state = getPredState(p)
               const cfg = stateConfig[state]
               return (
