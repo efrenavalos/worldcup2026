@@ -105,9 +105,10 @@ const MatchPredictionsModal = ({ match, onClose }) => {
  )
 
  const isAdmin = profile?.is_admin
- const visiblePredictions = (showOthers || isAdmin)
-   ? allSorted
-   : allSorted.filter(p => p.profiles?.id === profile?.id)
+ 
+ const visiblePredictions = (showOthers || isAdmin || isFinished)
+  ? allSorted
+  : allSorted.filter(p => p.profiles?.id === profile?.id)
 
  const counts = (predictions || []).reduce((acc, p) => {
    const s = getPredState(p)
