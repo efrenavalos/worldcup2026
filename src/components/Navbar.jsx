@@ -141,20 +141,25 @@ const Navbar = () => {
       </Menu>
 
       {isMobile && (
-        <Paper elevation={0} sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000, borderTop: '1px solid #1e3a5f' }}>
-          <BottomNavigation
-            value={currentIndex >= 0 ? currentIndex : false}
-            onChange={(_, newValue) => navigate(navItems[newValue].path)}
-            sx={{ background: '#0b1f3a' }}>
-            {navItems.map((item) => (
-              <BottomNavigationAction key={item.path} label={item.label} icon={item.icon} sx={{
-                color: 'text.secondary',
-                '&.Mui-selected': { color: 'primary.main' },
-                '& .MuiBottomNavigationAction-label': { fontSize: '0.6rem' },
-              }} />
-            ))}
-          </BottomNavigation>
-        </Paper>
+        <Paper elevation={0} sx={{
+            position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000,
+            borderTop: '1px solid #1e3a5f',
+            // Safe area para iPhone — evita que el home indicator tape la navbar
+            paddingBottom: 'env(safe-area-inset-bottom)',
+          }}>
+            <BottomNavigation
+              value={currentIndex >= 0 ? currentIndex : false}
+              onChange={(_, newValue) => navigate(navItems[newValue].path)}
+              sx={{ background: '#0b1f3a' }}>
+              {navItems.map((item) => (
+                <BottomNavigationAction key={item.path} label={item.label} icon={item.icon} sx={{
+                  color: 'text.secondary',
+                  '&.Mui-selected': { color: 'primary.main' },
+                  '& .MuiBottomNavigationAction-label': { fontSize: '0.6rem' },
+                }} />
+              ))}
+            </BottomNavigation>
+          </Paper>
       )}
     </>
   )
