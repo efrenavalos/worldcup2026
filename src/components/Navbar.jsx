@@ -142,11 +142,11 @@ const Navbar = () => {
 
       {isMobile && (
         <Paper elevation={0} sx={{
-            position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000,
-            borderTop: '1px solid #1e3a5f',
-            // Safe area para iPhone — evita que el home indicator tape la navbar
-            paddingBottom: 'env(safe-area-inset-bottom)',
-          }}>
+              position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000,
+              borderTop: '1px solid #1e3a5f',
+              paddingBottom: 'env(safe-area-inset-bottom)',
+              background: '#0b1f3a',
+            }}>
             <BottomNavigation
               value={currentIndex >= 0 ? currentIndex : false}
               onChange={(_, newValue) => navigate(navItems[newValue].path)}

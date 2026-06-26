@@ -10,7 +10,7 @@ const Footer = () => (
       textAlign: 'center',
       background: '#08121f',
       // Espacio extra en mobile por el bottom nav
-      pb: { xs: 10, sm: 2 },
+      pb: { xs: 'calc(56px + env(safe-area-inset-bottom))', sm: 2 },
     }}
   >
     <Typography variant="caption" color="text.secondary">
