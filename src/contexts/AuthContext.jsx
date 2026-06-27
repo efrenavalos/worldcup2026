@@ -1,35 +1,46 @@
 // contexts/AuthContext.jsx
-// Contexto global de autenticación con Supabase Auth
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../services/supabaseClient'
 
 const AuthContext = createContext(null)
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null)        // auth.users de Supabase
-  const [profile, setProfile] = useState(null)  // tabla profiles (name, is_admin)
+  const [user, setUser] = useState(null)
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // Carga el perfil extendido desde tabla profiles
   const loadProfile = async (userId) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
-
-    if (!error && data) setProfile(data)
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+      if (!error && data) setProfile(data)
+    } catch (e) {
+      console.error('Error cargando perfil:', e)
+    }
   }
 
   useEffect(() => {
-    // Sesión inicial al montar
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      if (session?.user) loadProfile(session.user.id)
+    // Timeout de seguridad — si getSession tarda más de 5s, desbloquea la app
+    const timeout = setTimeout(() => {
       setLoading(false)
-    })
+    }, 5000)
 
-    // Listener para cambios de auth (login, logout, refresh)
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setUser(session?.user ?? null)
+        if (session?.user) loadProfile(session.user.id)
+      })
+      .catch((e) => {
+        console.error('Error getSession:', e)
+      })
+      .finally(() => {
+        clearTimeout(timeout)
+        setLoading(false)
+      })
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setUser(session?.user ?? null)
@@ -42,17 +53,18 @@ export const AuthProvider = ({ children }) => {
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      clearTimeout(timeout)
+      subscription.unsubscribe()
+    }
   }, [])
 
-  // Login con email/password
   const signIn = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
     return data
   }
 
-  // Logout
   const signOut = async () => {
     await supabase.auth.signOut()
     setUser(null)
