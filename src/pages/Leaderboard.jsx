@@ -8,14 +8,31 @@ import LeaderboardTable from '../components/LeaderboardTable'
 
 const STAGE_ORDER = ['GROUP_STAGE', 'LAST_32', 'LAST_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'THIRD_PLACE', 'FINAL']
 
-const STAGE_LABELS = {
- GROUP_STAGE:    'Grupos',
- LAST_32:        '16avos',
- LAST_16:        'Octavos',
- QUARTER_FINALS: 'Cuartos',
- SEMI_FINALS:    'Semis',
- THIRD_PLACE:    '3er Lugar',
- FINAL:          '🏆 Final',
+// Configuración de tabs — últimos 3 stages acumulados en "Finales"
+const TABS_CONFIG = [
+ { label: 'General',      stages: null },
+ { label: 'Grupos',       stages: ['GROUP_STAGE'] },
+ { label: '16avos',       stages: ['LAST_32'] },
+ { label: 'Octavos',      stages: ['LAST_16'] },
+ { label: 'Cuartos',      stages: ['QUARTER_FINALS'] },
+ { label: '🏆 Semis+3ero+Final',   stages: ['SEMI_FINALS', 'THIRD_PLACE', 'FINAL'] },
+]
+
+// Suma puntos de múltiples stages para un mismo usuario
+const mergeStages = (byStage, stages) => {
+ if (!byStage || !stages) return []
+ const merged = {}
+ for (const stage of stages) {
+   for (const row of byStage[stage] || []) {
+     if (!merged[row.user_id]) {
+       merged[row.user_id] = { ...row, total_points: 0, exact_hits: 0, winner_hits: 0 }
+     }
+     merged[row.user_id].total_points += row.total_points
+     merged[row.user_id].exact_hits   += row.exact_hits
+     merged[row.user_id].winner_hits  += row.winner_hits
+   }
+ }
+ return Object.values(merged)
 }
 
 const Leaderboard = () => {
@@ -31,7 +48,7 @@ const Leaderboard = () => {
        .select(`user_id, total_points, exact_hits, winner_hits, profiles ( name, email, is_admin )`)
      if (error) throw error
      return data
-       .filter(s => !s.profiles?.is_admin)  // excluir admins
+       .filter(s => !s.profiles?.is_admin)
        .map(s => ({
          user_id: s.user_id,
          name: s.profiles?.name || s.profiles?.email || 'Jugador',
@@ -47,21 +64,21 @@ const Leaderboard = () => {
  const { data: byStage, isLoading: loadingStage } = useQuery({
    queryKey: ['standings-by-stage'],
    queryFn: async () => {
-     // 1. Todos los usuarios NO admin
+     // 1. Usuarios no admin
      const { data: profiles } = await supabase
        .from('profiles')
        .select('id, name, email, is_admin')
-     
+
      const playersOnly = (profiles || []).filter(p => !p.is_admin)
 
-     // 2. Todas las predicciones con stage
+     // 2. Predicciones con stage
      const { data: preds, error } = await supabase
        .from('predictions')
        .select(`user_id, points_awarded, matches ( stage )`)
        .not('matches.stage', 'is', null)
      if (error) throw error
 
-     // 3. Agrupar por stage → usuario (solo jugadores)
+     // 3. Inicializar todos los stages con todos los jugadores en 0
      const result = {}
      for (const stage of STAGE_ORDER) {
        result[stage] = playersOnly.map(p => ({
@@ -73,10 +90,10 @@ const Leaderboard = () => {
        }))
      }
 
-     // 4. Sumar puntos donde los haya
+     // 4. Sumar puntos
      const playerIds = new Set(playersOnly.map(p => p.id))
      for (const p of preds) {
-       if (!playerIds.has(p.user_id)) continue  // ignorar admin
+       if (!playerIds.has(p.user_id)) continue
        const stage = p.matches?.stage
        if (!stage || !result[stage]) continue
        const row = result[stage].find(r => r.user_id === p.user_id)
@@ -93,11 +110,9 @@ const Leaderboard = () => {
 
  const loading = isLoading || loadingStage
 
- const tabs = ['General', ...STAGE_ORDER.map(s => STAGE_LABELS[s])]
- const currentStage = tab === 0 ? null : STAGE_ORDER[tab - 1]
  const currentStandings = tab === 0
    ? (standings || [])
-   : (byStage?.[currentStage] || [])
+   : mergeStages(byStage, TABS_CONFIG[tab].stages)
 
  return (
    <Box sx={{ maxWidth: 640, mx: 'auto', px: 2, py: 3 }}>
@@ -122,8 +137,8 @@ const Leaderboard = () => {
          '& .MuiTab-root': { fontWeight: 600, textTransform: 'none', minWidth: 0, fontSize: '0.8rem' },
        }}
      >
-       {tabs.map((label, i) => (
-         <Tab key={i} label={label} />
+       {TABS_CONFIG.map((t, i) => (
+         <Tab key={i} label={t.label} />
        ))}
      </Tabs>
 
