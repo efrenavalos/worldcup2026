@@ -1,6 +1,6 @@
 // App.jsx
 import { BrowserRouter } from 'react-router-dom'
-import { ThemeProvider, CssBaseline, Box } from '@mui/material'
+import { ThemeProvider, CssBaseline, Box, CircularProgress} from '@mui/material'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import darkTheme from './theme/darkTheme'
 import { AuthProvider } from './contexts/AuthContext'
@@ -22,7 +22,17 @@ const queryClient = new QueryClient({
 
 // Layout wrapper que solo muestra Navbar cuando hay sesión
 const AppLayout = () => {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
+
+  // Esperar a que auth esté listo antes de renderizar
+  if (loading) return (
+    <Box sx={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      minHeight: '100vh', background: '#08121f',
+    }}>
+      <CircularProgress color="primary" />
+    </Box>
+  )
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
